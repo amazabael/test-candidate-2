@@ -131,8 +131,8 @@ variable "key_name" {
 }
 
 variable "ami" {
-    
-   type = string 
-   default = "ami-0b614a5d911900a9b"
-  
+
+  type    = string
+  default = "ami-0b614a5d911900a9b"
+
 }

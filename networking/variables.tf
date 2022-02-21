@@ -50,7 +50,7 @@ variable "vpc_pub_subnets" {
  {
       name                    = "nombre",
       cidr_block              = "10.1.96.32/27",
-      availability_zone       = "us-east-2b"
+      availability_zone       = "us-east-2c"
       map_public_ip_on_launch = true
       tags = {
         "env" = "appgate-test-alex"

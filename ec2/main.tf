@@ -24,6 +24,13 @@ ingress  {
         self = false
     
       } 
+      
+      egress   {
+        cidr_blocks =  ["0.0.0.0/0"]
+        from_port = 0
+        protocol =  "-1"
+        to_port = 0
+    }
 
       vpc_id = var.vpc_id
 
@@ -133,20 +140,30 @@ instance_id = aws_instance.web-server.id
 
 
 resource "aws_instance" "web-server" {
+
   ami             = var.ami # Amazon Linux 2 AMI(HVM 64-bitx86)
   instance_type   = "t3.micro"
   subnet_id       =  var.vpc_pri_subnets[0]
   key_name        =  aws_key_pair.deployer-appgate.key_name
+  associate_public_ip_address = true
+
   security_groups = [aws_security_group.sg-instance.id]
+
    tags = {
     Name = "appgate-instance-web-server"
   }
   user_data                = <<EOF
  #!/bin/bash 
- sudo apt update
- sudo apt upgrade -y
- docker pull httpd:latest
- docker run -d httpd
+ sudo yum update -y
+ sudo yum install -y yum-utils
+  
+ sudo yum-config-manager --save --setopt=docker-ce-stable.skip_if_unavailable=true
+ sudo yum install docker -y
+ sudo systemctl start docker
+ sudo docker pull httpd:latest
+ sudo docker run -d --name apache-server -p 80:80 httpd
+ sudo docker volume create apache-data
+ sudo ln -s /var/lib/docker/volumes/apache-data/_data /apache
 
  EOF
 
@@ -157,33 +174,80 @@ resource "aws_instance" "web-server" {
 #“/appgate/testpage”
 
 resource "aws_instance" "web-page" {
+    
   ami             = var.ami # Amazon Linux 2 AMI(HVM 64-bitx86)
   instance_type   = "t3.micro"
-  subnet_id       =  var.vpc_pri_subnets[1]
+  subnet_id       =  var.vpc_pri_subnets[1].id
   key_name        =  aws_key_pair.deployer-appgate.key_name
+  security_groups = [aws_security_group.sg-instance.id]
+  
+  associate_public_ip_address  = true
 
   tags = {
     Name = "appgate-instance-webpage"
   }
  user_data                = <<EOF
  #!/bin/bash 
- sudo apt update
- sudo apt upgrade -y
- docker pull httpd:latest
- docker run -d httpd
+ sudo yum update -y
+ sudo yum install -y yum-utils
 
+ sudo yum-config-manager --save --setopt=docker-ce-stable.skip_if_unavailable=true
+ sudo yum install docker -y
+ sudo systemctl start docker
+ sudo docker pull httpd:latest
+ sudo docker run -d --name apache-server -p 80:80 httpd
+ sudo docker volume create apache-data
+ sudo ln -s /var/lib/docker/volumes/apache-data/_data /apache
+ 
  EOF
 
 
 }
 
-resource "aws_alb_listener" "appgate-alb" {
-
-    
+resource "aws_lb" "load_balancer-appgate" {
   
+  name               = "web-app-lb"
+  load_balancer_type = "application"
+  subnets            = var.vpc_pub_subnets
+  security_groups    = [aws_security_group.alb-securitygroup.id]
+
 }
 
+ resource "aws_lb_listener" "http" {
 
+  load_balancer_arn = aws_lb.load_balancer-appgate.arn
 
+  port = 80
 
+  protocol = "HTTP"
 
+  
+  default_action {
+    target_group_arn = aws_lb_target_group.target-appgate.id
+    type             = "forward"
+  }
+ }
+
+resource "aws_lb_target_group" "target-appgate" {
+  name        = "tg-appgate"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = "${var.vpc_id}"
+  depends_on = [aws_instance.web-page]
+}
+
+resource "aws_lb_target_group_attachment" "target-g-appgate"{
+  
+  target_group_arn = aws_lb_target_group.target-appgate.id
+  target_id        = aws_instance.web-page.id
+  port             = 80
+
+}
+
+resource "aws_lb_target_group_attachment" "target-g-appgate-1"{
+  
+  target_group_arn = aws_lb_target_group.target-appgate.id
+  target_id        = aws_instance.web-server.id
+  port             = 80
+
+}

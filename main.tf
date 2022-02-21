@@ -13,20 +13,21 @@ module "appgate-network" {
   vpc_tags                 = var.vpc_tags
   vpc_enable_dns_hostnames = var.vpc_enable_dns_hostnames
   #vpc_id                   = module.appgate-network.vpc_id
- # nat-appgate              = 
- # aws_eip                  = 
+  # nat-appgate              = 
+  # aws_eip                  = 
 
- # name_subnet_nat = var.name_subnet_nat
+  # name_subnet_nat = var.name_subnet_nat
 
 
 }
 
 module "appate-ec2" {
 
-    source = "./ec2"
-    key_name             = var.key_name
-    ami                  = var.ami
-    vpc_pri_subnets      = module.appgate-network.this_sub_pri
-    vpc_id               = module.appgate-network.vpc_id
+  source          = "./ec2"
+  key_name        = var.key_name
+  ami             = var.ami
+  vpc_pri_subnets = module.appgate-network.this_sub_pri
+  vpc_id          = module.appgate-network.vpc_id
+  vpc_pub_subnets = module.appgate-network.this_sub_pub
 
 }
